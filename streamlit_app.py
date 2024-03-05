@@ -3,8 +3,6 @@ import json
 import streamlit as st
 # Set the AWS credentials
 import pandas as pd
-aws_access_key_id = 'AKIA4KKU2MORKIFTW3XH'
-aws_secret_access_key = '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'
 
 # Create an S3 client
 s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
