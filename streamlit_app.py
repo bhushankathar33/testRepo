@@ -1,55 +1,31 @@
-import streamlit as st
-import snowflake.connector
 import boto3
+import json
+import streamlit as st
+# Set the AWS credentials
 import pandas as pd
+aws_access_key_id = 'AKIA4KKU2MORKIFTW3XH'
+aws_secret_access_key = '+drZGphyxzjKP1yv0yfap2j4oGvs0q9wAgp3ANxO'
 
-# Snowflake Connection Parameters
-snowflake_account = 'your_account'
-snowflake_user = 'your_user'
-snowflake_password = 'your_password'
-snowflake_database = 'your_database'
-snowflake_schema = 'your_schema'
+# Create an S3 client
+s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
 
-# Function to connect to Snowflake
-def connect_to_snowflake():
-    return snowflake.connector.connect(
-        user=snowflake_user,
-        password=snowflake_password,
-        account=snowflake_account,
-        database=snowflake_database,
-        schema=snowflake_schema
-    )
+# Create an S3 resource
+s3_resource = boto3.resource('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
 
-# Function to list Snowflake Data Stages
-def list_data_stages():
-    conn = connect_to_snowflake()
-    cursor = conn.cursor()
-    cursor.execute("SHOW STAGES")
-    stages = [row[1] for row in cursor.fetchall()]
-    conn.close()
-    return stages
-
-# Function to list files on S3 bucket
-def list_files_s3(bucket_name):
-    s3 = boto3.resource('s3')
-    bucket = s3.Bucket(bucket_name)
-    files = []
-    for obj in bucket.objects.all():
-        files.append({
-            'Name': obj.key,
-            'Size (bytes)': obj.size,
-            'Last Modified': obj.last_modified
-        })
-    return files
-
-# Main Streamlit app
 def main():
+    print("bhushan")
     st.title('Data Exploration App')
 
-    # Sidebar for selecting Snowflake stage and S3 bucket
-    snowflake_stages = list_data_stages()
-    selected_stage = st.sidebar.selectbox('Select Snowflake Stage', snowflake_stages)
+    # List all the buckets in your account
+    buckets = s3.list_buckets()
+
+    # Print the names of all the buckets
+    for bucket in buckets['Buckets']:
+        print(list_files_s3(bucket['Name']))
+    
     selected_bucket = st.sidebar.text_input('Enter S3 Bucket Name')
+
+    files = []
 
     # Display files in selected S3 bucket
     if selected_bucket:
@@ -58,25 +34,26 @@ def main():
         st.write(pd.DataFrame(files))
 
     # File selection and preview
-    selected_file = st.selectbox('Select File', files['Name'])
-    if selected_file:
-        file_contents = pd.read_csv(f's3://{selected_bucket}/{selected_file}')
-        st.write('Preview of File Contents:')
-        st.write(file_contents)
+    selected_file_name = st.selectbox('Select File', [file['Name'] for file in files])
+    if selected_file_name:
+        selected_file = next((file for file in files if file['Name'] == selected_file_name), None)
+        if selected_file:
+            file_contents = pd.read_csv(f's3://{selected_bucket}/{selected_file_name}')
+            st.write('Preview of File Contents:')
+            st.write(file_contents)
+        
 
-    # Data profiling
-    if file_contents is not None:
-        selected_column = st.selectbox('Select Column', file_contents.columns)
-        if selected_column:
-            column_data = file_contents[selected_column]
-            st.write('Data Profile:')
-            st.write(column_data.describe())
-
-    # Data ingestion
-    if st.button('Ingest Data'):
-        # Logic for ingesting data into database table
-        pass
+# Function to list files on S3 bucket
+def list_files_s3(bucket_name):
+    bucket_resource = s3_resource.Bucket(bucket_name)
+    files = []
+    for obj in bucket_resource.objects.all():        
+        files.append({
+            'Name': obj.key,
+            'Size (bytes)': obj.size,
+            'Last Modified': obj.last_modified
+        })
+    return files
 
 if __name__ == "__main__":
     main()
-
